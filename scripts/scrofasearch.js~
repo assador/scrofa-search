@@ -1,0 +1,352 @@
+var obj, svg, tags, items;
+window.addEventListener("load", smSearchInitialize, false);
+// Асинхронный вызов указанной функции, которой передаётся объект XMLHttpRequest
+function smSearchXhr(url, func) {
+	var xhr = new XMLHttpRequest();
+	xhr.open("GET", url, true);
+	xhr.onreadystatechange = function() {if(xhr.readyState == 4 && xhr.status == 200) {func(xhr);}}
+	xhr.send(null);
+}
+// Определение уровня вложенности элемента
+function smSearchGetLevel(element) {
+	return element.parentNode.getAttribute("id") != "gC" ? smSearchGetLevel(element.parentNode) + 1 : 0;
+}
+// Скрытие групп ниже определённого уровня
+function smSearchHideLower(level) {
+	for(var i = 0; i < svg.Groups.length; i++) {
+		if(svg.Groups[i].Level >= level && svg.Groups[i].Shown) {smSearchShowHide(svg.Groups[i], false);}
+	}
+}
+// Скрытие / показ элемента
+function smSearchShowHide(element, show) {
+	if(show != true && show != false) {show = element.Shown ? false : true;}
+	if(show) {
+		element.Shown = true; element.style.display = "inline";
+		element.setAttribute("class", element.getAttribute("class").replace(/\s*\b(?:show|hide)\b/g, ""));
+		element.setAttribute("class", element.getAttribute("class") + " show");
+	} else {
+		element.Shown = false;
+		element.setAttribute("class", element.getAttribute("class").replace(/\s*\b(?:show|hide)\b/g, ""));
+		element.setAttribute("class", element.getAttribute("class") + " hide");
+	}
+	return show;
+}
+// Приближение / удаление
+function smSearchZoom(count) {
+	if(count == 0) {return false;}
+	if(svg.LevelCur + count < 1) {count = 1 - svg.LevelCur;}
+	var g0 = svg.getElementById("g0");
+	var sNew = Math.pow(svg.Z, 2 - count - svg.LevelCur);
+	g0.style.transform = g0.style.transform.replace(/scale\s*\([^()]*\)/ig, "scale(" + sNew + ")");
+	// Изменение прозрачности нижних уровней
+	for(var i = 0; i < svg.Images.length; i++) {
+		svg.Images[i].style.opacity = Math.pow(svg.O, Math.abs(svg.LevelCur + count - svg.Images[i].Level));
+	}
+	svg.LevelCur += count;
+}
+// Определение локальных координат
+function smSearchLocalXY(e) {
+	var point = svg.documentElement.createSVGPoint();
+	point.x = e.clientX; point.y = e.clientY;
+	return point.matrixTransform(svg.documentElement.getScreenCTM().inverse());
+}
+// Обработка drag and drop
+function smSearchDragStart(e) {
+	function onDrag(e) {
+		loc = smSearchLocalXY(e);
+		x = x1 + (loc.x - sx) / s, y = y1 + (loc.y - sy) / s;
+		self.style.transform = self.style.transform.replace(/translate\s*\([^()]*\)/ig, "translate(" + x + "px, " + y + "px)");
+	}
+	function onEnd() {
+		switch(self.Type) {
+			case "tag" :
+				// Добавление или нет
+				if(Math.pow(svg.S, 2) > Math.pow(50 - loc.x, 2) + Math.pow(50 - loc.y, 2)) {
+					if(!self.AttrVirtual && !self.Selected) {
+						// Анимация добавления (рамка)
+						var anim = svg.getElementById("i" + self.AttrId + "a5");
+						anim.setAttribute("values", window.getComputedStyle(svg.getElementById("i" + self.AttrId + "p1"), null).stroke + "; #ffffff");
+						anim.beginElement();
+						// Анимация добавления
+						var anim = svg.getElementById("i" + self.AttrId + "a3");
+						anim.setAttribute("from", 0);
+						anim.setAttribute("to", window.getComputedStyle(svg.getElementById("i" + self.AttrId + "p1"), null).opacity);
+						anim.beginElement();
+						var anim = svg.getElementById("gSa7");
+						anim.beginElement();
+						// Добавление
+						smSearchSelect(self);
+					}
+				}
+				// Показ подгруппы при приближении и скрытие при удалении
+				if(Math.pow(50 - sx, 2) + Math.pow(50 - sy, 2) > Math.pow(50 - loc.x, 2) + Math.pow(50 - loc.y, 2)) {
+					if(self.ChildrenGroup.Images.length > 0) {
+						smSearchHideLower(self.Level);
+						smSearchShowHide(self.ChildrenGroup, true);
+						smSearchZoom(self.Level + 1 - svg.LevelCur);
+					}
+				} else {
+					smSearchHideLower(self.Level);
+					smSearchShowHide(self.ChildrenGroup, false);
+					smSearchZoom(self.Level - svg.LevelCur);
+				}
+				// Анимация возвращения на место
+				self.setAttribute("class", self.getAttribute("class") + " move");
+				self.style.transform = self.style.transform.replace(/translate\s*\([^()]*\)/ig, "translate(" + x1 + "px, " + y1 + "px)");
+				break;
+			case "selected" :
+				if(Math.pow(svg.S, 2) < Math.pow(50 - loc.x, 2) + Math.pow(50 - loc.y, 2)) {
+					smSearchUnselect(self);
+				} else {
+					// Анимация возвращения на место
+					var anim = svg.getElementById("s" + self.AttrId + "a11");
+					anim.setAttribute("from", x + ", " + y);
+					anim.setAttribute("to", x1 + ", " + y1);
+					anim.addEventListener("end", function() {this.parentNode.Drag = false;}, false);
+					anim.beginElement();
+					self.style.transform = self.style.transform.replace(/translate\s*\([^()]*\)/ig, "translate(" + x1 + "px, " + y1 + "px)");
+				}
+				break;
+		}
+	}
+	function smSearchDragDrag(e) {
+		if(!self.Drag) {self.Drag = true;}
+		onDrag(e);
+	}
+	function smSearchDragEnd() {
+		if(self.Drag) {onEnd();}
+		svg.removeEventListener("mousemove", smSearchDragDrag, false);
+		svg.removeEventListener("mouseup", smSearchDragEnd, false);
+	}
+	if(!this.Drag) {
+		e.preventDefault();
+		var self = this;
+		var x1, y1, x, y, loc = smSearchLocalXY(e), sx = loc.x, sy = loc.y, s;
+		[undefined, x, y] = /translate\s*\(\s*(.*?)\s*,\s*(.*?)/i.exec(self.style.transform);
+		x1 = x = parseInt(x); y1 = y = parseInt(y);
+		console.log(x);
+		switch(self.Type) {
+			case "tag" :
+				s = Math.pow(svg.Z, 1 + self.Level - svg.LevelCur);
+				break;
+			case "selected" : default :
+				s = 1;
+				break;
+		}
+		svg.addEventListener("mousemove", smSearchDragDrag, false);
+		svg.addEventListener("mouseup", smSearchDragEnd, false);
+	}
+}
+// Позиционирование выбранных элементов
+function smSearchArrangeSelected() {
+	var x, y, x1, y1, sels = svg.getElementById("gS").getElementsByClassName("smSearchSelected");
+	for(var i = 0; i < sels.length; i++) {
+		x = sels[i].transform.animVal.getItem(0).matrix.e, y = y1 = sels[i].transform.animVal.getItem(0).matrix.f;
+		x1 = 30 * (2 * i - sels.length + 1) / (2 * (sels.length + 1));
+		// Анимация позиционирования
+		sels[i].style.transform = sels[i].style.transform.replace(/translate\s*\([^()]*\)/ig, "translate(" + x1 + "px, " + y1 + "px)");
+	}
+}
+// Добавление i в центр
+function smSearchSelect(element) {
+	var newSelected = svg.getElementById("smSearchSelectedDef").cloneNode(true);
+	newSelected.setAttribute("id", "s" + element.AttrId);
+	newSelected.setAttribute("class", "smSearchSelected");
+	smSearchShowHide(newSelected, true);
+	newSelected.style.transform = "translate(0, 0)";
+	newSelected.setAttribute("title", element.AttrName);
+	// Оформление // Удалить
+	newSelected.getElementsByTagName("circle")[0].setAttribute("id", "s" + element.AttrId + "c1");
+	newSelected.getElementsByTagName("circle")[0].setAttribute("style", "fill: " + window.getComputedStyle(svg.getElementById("i" + element.AttrId + "p1"), null).fill + ";");
+	svg.getElementById("gS").appendChild(newSelected);
+	// Создание свойств для s
+	newSelected.Type = "selected";
+	newSelected.Drag = false;
+	newSelected.AttrId = element.AttrId;
+	newSelected.AttrName = element.AttrName;
+	newSelected.AttrVirtual = element.AttrVirtual;
+	newSelected.AttrReplaces = element.AttrReplaces;
+	// Событие drag and drop
+	newSelected.addEventListener("click", function(evt) {if(!!this.Drag) {this.Drag = false;}}, false);
+	newSelected.addEventListener("mousedown", smSearchDragStart, false);
+	// Удаление из центра s, замещаемых новым
+	for(var i = 0; i < element.AttrReplaces.length; i++) {
+		if(svg.getElementById("s" + element.AttrReplaces[i])) {smSearchUnselect(svg.getElementById("s" + element.AttrReplaces[i]));}
+	}
+	element.Selected = true;
+	smSearchArrangeSelected();
+	smSearchShowSelected(); // Удалить
+	smSearchShowResults(); // Удалить
+}
+// Удаление s из центра
+function smSearchUnselect(element) {
+	smSearchShowHide(element, false);
+	svg.getElementById("gC").appendChild(element);
+	// По завершению анимации удаление и сопутствующее
+	element.addEventListener("animationend", function() {element.parentNode.removeChild(element);}, false);
+	// Анимация для i
+	var anim = svg.getElementById("i" + element.AttrId + "a5");
+	anim.setAttribute("values", window.getComputedStyle(svg.getElementById("i" + element.AttrId + "p1"), null).stroke + "; " + svg.getElementById("i" + element.AttrId + "p1").Color);
+	anim.beginElement();
+	svg.getElementById("i" + element.AttrId).Selected = false;
+	smSearchArrangeSelected();
+	smSearchShowSelected(); // Удалить
+	smSearchShowResults(); // Удалить
+}
+// Показ выбранных тэгов // Удалить
+function smSearchShowSelected() {
+	if(svg.getElementById("tS")) {svg.getElementById("tS").parentNode.removeChild(svg.getElementById("tS"));}
+	svg.documentElement.appendChild(svg.getElementById("smSearchTextDef").cloneNode(true)).setAttribute("id", "tS");
+	var sels = svg.getElementsByClassName("smSearchSelected");
+	for(var i = 0; i < sels.length; i++) {
+		svg.getElementById("tS").appendChild(svg.getElementById("smSearchTspanDef").cloneNode(true)).textContent = sels[i].AttrName;
+	}
+}
+// Показ результатов
+function smSearchShowResults() {
+	if(svg.getElementById("tR")) {svg.getElementById("tR").parentNode.removeChild(svg.getElementById("tR"));}
+	svg.documentElement.appendChild(svg.getElementById("smSearchResTextDef").cloneNode(true)).setAttribute("id", "tR");
+	var sels = svg.getElementsByClassName("smSearchSelected");
+	for(var i = 0; i < items.length; i++) {
+		items[i].Selected = true;
+		for(var y = 0; y < sels.length; y++) {
+			var re = new RegExp("\\b" + sels[y].AttrId + "\\b");
+			if(!re.test(items[i].getAttribute("tags"))) {
+				items[i].Selected = false;
+			}
+		}
+		if(items[i].Selected) {
+			svg.getElementById("tR").appendChild(svg.getElementById("smSearchResTspanDef").cloneNode(true)).textContent = items[i].getAttribute("name");
+		}
+	}
+}
+// Инициализация
+function smSearchInitialize() {
+	obj = document.getElementById("smSearchObj");
+	svg = obj.contentDocument;
+	svg.TagsXml = obj.getAttribute("smSearchTagsXml");
+	svg.ItemsXml = obj.getAttribute("smSearchItemsXml");
+	svg.R = obj.getAttribute("smSearchR") ? eval(obj.getAttribute("smSearchR")) : 65; // Основной радиус
+	svg.S = obj.getAttribute("smSearchS") ? eval(obj.getAttribute("smSearchS")) : 17; // Радиус зоны добавления
+	svg.G1 = obj.getAttribute("smSearchG1") ? eval(obj.getAttribute("smSearchG1")) : 0.015; // 1-ое расстояние между соседними сегментами
+	svg.G2 = obj.getAttribute("smSearchG2") ? eval(obj.getAttribute("smSearchG2")) : 0.06; // 2-ое расстояние между соседними сегментами
+	svg.W1 = obj.getAttribute("smSearchW1") ? eval(obj.getAttribute("smSearchW1")) : 19; // Толщина сегментов
+	svg.W2 = obj.getAttribute("smSearchW2") ? eval(obj.getAttribute("smSearchW2")) : 23; // Толщина открытых сегментов
+	svg.Z = obj.getAttribute("smSearchZ") ? eval(obj.getAttribute("smSearchZ")) : 0.6; // Расстояние между кругами
+	svg.O = obj.getAttribute("smSearchO") ? eval(obj.getAttribute("smSearchO")) : 0.6; // Шаг прозрачности кругов
+	svg.G3 = 0.075; // Удалить - исправив!
+	svg.LevelCur = 1;
+	// Получение из XML-файла tags и построение тэгов
+	svg.BuildTags = function(xhr) {
+		tags = xhr.responseXML.getElementsByTagName("tag");
+		// Создание i и g для тэгов
+		for(var i = 0; i < tags.length; i++) {
+			var newImage = svg.getElementById("smSearchImageDef").cloneNode(true);
+			var newGroup = svg.getElementById("smSearchGroupDef").cloneNode(true);
+			newImage.setAttribute("id", "i" + tags[i].getAttribute("id"));
+			newGroup.setAttribute("id", "g" + tags[i].getAttribute("id"));
+			newImage.setAttribute("class", "smSearchImage");
+			newImage.style.transform = "translate(0, 0)";
+			newImage.addEventListener("transitionend", function(evt) {console.log(evt.animationName);
+				if(evt.transitionName == "hide" && !this.Shown) {
+					this.parentNode.Drag = false;
+					self.setAttribute("class", self.getAttribute("class").replace(/\s*\bmove\b/g, ""));
+				}
+			}, false);
+			newGroup.Shown = false; newGroup.style.display = "none";
+			newGroup.addEventListener("animationend", function(evt) {
+				if(evt.animationName == "hide" && !this.Shown) {
+					this.style.display = "none";
+				}
+			}, false);
+			newGroup.setAttribute("class", "smSearchGroup zoom");
+			newGroup.style.transform = "translate(0, 0)";
+			newImage.getElementsByTagName("path")[0].setAttribute("id", "i" + tags[i].getAttribute("id") + "p1");
+			newImage.getElementsByTagName("animate")[0].setAttribute("id", "i" + tags[i].getAttribute("id") + "a5");
+			newImage.getElementsByTagName("animate")[1].setAttribute("id", "i" + tags[i].getAttribute("id") + "a8");
+			newImage.getElementsByTagName("animate")[2].setAttribute("id", "i" + tags[i].getAttribute("id") + "a3");
+			newImage.getElementsByTagName("animateTransform")[0].setAttribute("id", "i" + tags[i].getAttribute("id") + "a6");
+			newImage.getElementsByTagName("text")[0].getElementsByTagName("textPath")[0].setAttributeNS("http://www.w3.org/1999/xlink", "href", "#i" + tags[i].getAttribute("id") + "p1");
+			newImage.getElementsByTagName("text")[0].getElementsByTagName("textPath")[0].getElementsByTagName("tspan")[0].textContent = tags[i].getAttribute("name");
+			if(tags[i].parentNode.tagName == "tags") {
+				svg.getElementById("g0").appendChild(newImage);
+				svg.getElementById("g0").appendChild(newGroup);
+			} else {
+				svg.getElementById("g" + tags[i].parentNode.getAttribute("id")).appendChild(newImage);
+				svg.getElementById("g" + tags[i].parentNode.getAttribute("id")).appendChild(newGroup);
+			}
+			// Создание свойств для g
+			newGroup.Image = newImage;
+			// Создание свойств для i
+			newImage.Type = "tag";
+			newImage.ChildrenGroup = newGroup;
+			newImage.Selected = false;
+			newImage.Drag = false;
+			newImage.AttrId = tags[i].getAttribute("id");
+			newImage.AttrName = (tags[i].getAttribute("name") == null ? "" : tags[i].getAttribute("name"));
+			newImage.AttrVirtual = (tags[i].getAttribute("virtual") == null || tags[i].getAttribute("virtual") == "" ? false : Boolean(tags[i].getAttribute("virtual")));
+			newImage.AttrReplaces = (tags[i].getAttribute("replaces") == null || tags[i].getAttribute("replaces") == "" ? [] : tags[i].getAttribute("replaces").split(" "));
+			// Запоминание цвета path
+			newImage.getElementsByTagName("path")[0].Color = window.getComputedStyle(newImage.getElementsByTagName("path")[0], null).stroke;
+		}
+		// Настройка вида i и g для тэга
+		svg.Groups = svg.getElementsByClassName("smSearchGroup");
+		svg.Images = svg.getElementsByClassName("smSearchImage");
+		for(var i = 0; i < svg.Groups.length; i++) {
+			svg.Groups[i].Level = smSearchGetLevel(svg.Groups[i]);
+			svg.Groups[i].setAttribute("transform", "scale(" + svg.Z + ")");
+			// Сбор непосредственных i-детей
+			svg.Groups[i].Images = new Array();
+			for(var y = 0; y < svg.Groups[i].childNodes.length; y++) {if(svg.Groups[i].childNodes[y].nodeType == 1) {
+				if(/\bsmSearchImage\b/.test(svg.Groups[i].childNodes[y].getAttribute("class"))) {svg.Groups[i].Images.push(svg.Groups[i].childNodes[y]);}
+			}}
+			// Настройка вида i в конкретном g
+			for(var y = 0; y < svg.Groups[i].Images.length; y++) {
+				var pCs = new Array();
+				var path = svg.getElementById("i" + svg.Groups[i].Images[y].AttrId + "p1");
+				pCs.push(Math.cos(2 * y * Math.PI / svg.Groups[i].Images.length + svg.G1 * Math.PI) * svg.R);
+				pCs.push(0 - Math.sin(2 * y * Math.PI / svg.Groups[i].Images.length + svg.G1 * Math.PI) * svg.R);
+				pCs.push(Math.cos(2 * (y + 1) * Math.PI / svg.Groups[i].Images.length - svg.G1 * Math.PI) * svg.R);
+				pCs.push(0 - Math.sin(2 * (y + 1) * Math.PI / svg.Groups[i].Images.length - svg.G1 * Math.PI) * svg.R);
+				pCs.push(Math.cos(2 * (y + 1) * Math.PI / svg.Groups[i].Images.length - svg.G2 * Math.PI) * (svg.R - svg.W1));
+				pCs.push(0 - Math.sin(2 * (y + 1) * Math.PI / svg.Groups[i].Images.length - svg.G2 * Math.PI) * (svg.R - svg.W1));
+				pCs.push(Math.cos(2 * y * Math.PI / svg.Groups[i].Images.length + svg.G2 * Math.PI) * (svg.R - svg.W1));
+				pCs.push(0 - Math.sin(2 * y * Math.PI / svg.Groups[i].Images.length + svg.G2 * Math.PI) * (svg.R - svg.W1));
+				pCs.push(Math.cos(2 * (y + 1) * Math.PI / svg.Groups[i].Images.length - svg.G3 * Math.PI) * (svg.R - svg.W2));
+				pCs.push(0 - Math.sin(2 * (y + 1) * Math.PI / svg.Groups[i].Images.length - svg.G3 * Math.PI) * (svg.R - svg.W2));
+				pCs.push(Math.cos(2 * y * Math.PI / svg.Groups[i].Images.length + svg.G3 * Math.PI) * (svg.R - svg.W2));
+				pCs.push(0 - Math.sin(2 * y * Math.PI / svg.Groups[i].Images.length + svg.G3 * Math.PI) * (svg.R - svg.W2));
+				path.D1 = "M " + pCs[0] + " " + pCs[1] + " A " + svg.R + " " + svg.R + " 0 0 0 " + pCs[2] + " " + pCs[3] + " L " + pCs[4] + " " + pCs[5] + " A " + (svg.R - svg.W1) + " " + (svg.R - svg.W1) + " 0 0 1 " + pCs[6] + " " + pCs[7] + "Z";
+				path.D2 = "M " + pCs[0] + " " + pCs[1] + " A " + svg.R + " " + svg.R + " 0 0 0 " + pCs[2] + " " + pCs[3] + " L " + pCs[8] + " " + pCs[9] + " A " + (svg.R - svg.W2) + " " + (svg.R - svg.W2) + " 0 0 1 " + pCs[10] + " " + pCs[11] + "Z";
+				path.setAttribute("d", path.D1);
+			}
+		}
+		smSearchShowHide(svg.getElementById("g0"), true);
+		// Дальнейшая настройка i
+		for(var i = 0; i < svg.Images.length; i++) {
+			svg.Images[i].Level = smSearchGetLevel(svg.Images[i]);
+			// Событие открывания / закрывания детей i
+			svg.Images[i].addEventListener("click", function(evt) {
+				if(!this.Drag) {
+					smSearchHideLower(this.Level);
+					smSearchZoom((smSearchShowHide(this.ChildrenGroup) && this.ChildrenGroup.Images.length > 0 ? this.Level + 1 : this.Level) - svg.LevelCur);
+				}
+			}, false);
+			// Событие drag and drop
+			svg.Images[i].addEventListener("mousedown", smSearchDragStart, false);
+		}
+		// Событие приближения / удаления g0
+		svg.addEventListener("DOMMouseScroll", function(evt) {
+			evt.wheelDelta = -40 * evt.detail;
+			evt.preventDefault ? evt.preventDefault() : (evt.returnValue = false);
+			smSearchZoom(evt.wheelDelta / 360);
+		}, false);
+	}
+	// Получение из XML-файла items и их настройка
+	svg.BuildItems = function(xhr) {
+		items = xhr.responseXML.getElementsByTagName("item");
+	}
+	// Асинхронный вызов svg.smSearchGetTags
+	smSearchXhr(svg.TagsXml, svg.BuildTags);
+	smSearchXhr(svg.ItemsXml, svg.BuildItems);
+}

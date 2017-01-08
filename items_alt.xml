@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<items>
+	<item id="1" name="Первый ресторан">
+		<tag ofid="1_3" />
+		<tag ofid="2_2" />
+		<tag ofid="3_1" />
+		<tag ofid="3_1_1" />
+		<tag ofid="3_1_2" />
+		<tag ofid="3_2" />
+		<tag ofid="3_3" />
+		<tag ofid="4" />
+	</item>
+	<item id="2" name="Второй ресторан">
+		<tag ofid="1_1" />
+		<tag ofid="2_3" />
+		<tag ofid="3_2" />
+		<tag ofid="3_3" />
+	</item>
+	<item id="3" name="Третий ресторан">
+		<tag ofid="1_2" />
+		<tag ofid="2_1" />
+		<tag ofid="3_1" />
+		<tag ofid="3_1_1" />
+		<tag ofid="3_2" />
+		<tag ofid="4" />
+	</item>
+</items>

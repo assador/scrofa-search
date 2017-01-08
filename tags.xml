@@ -1,0 +1,22 @@
+<?xml version="1.0" ?>
+<tags>
+	<tag id="1" name="Дороговизна" virtual="1">
+		<tag id="1_1" name="Дешёвый" replaces="1_2 1_3" />
+		<tag id="1_2" name="Средний" replaces="1_1 1_3" />
+		<tag id="1_3" name="Дорогой" replaces="1_1 1_2" />
+	</tag>
+	<tag id="2" name="Курение" virtual="1">
+		<tag id="2_1" name="Для некурящих" replaces="2_2 2_3" />
+		<tag id="2_2" name="Смешанный" replaces="2_1 2_3" />
+		<tag id="2_3" name="Для курящих" replaces="2_1 2_2 4" />
+	</tag>
+	<tag id="3" name="Звук" virtual="1">
+		<tag id="3_1" name="Музыка" replaces="3_1_1 3_1_2">
+			<tag id="3_1_1" name="Живая музыка" replaces="3_1" />
+			<tag id="3_1_2" name="Музыка в записях" replaces="3_1" />
+		</tag>
+		<tag id="3_2" name="Громко" />
+		<tag id="3_3" name="Тихо" />
+	</tag>
+	<tag id="4" name="Можно с детьми" replaces="2_3" />
+</tags>
