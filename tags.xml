@@ -1,22 +1,25 @@
 <?xml version="1.0" ?>
 <tags>
 	<tag id="1" name="Дороговизна" virtual="1">
-		<tag id="1_1" name="Дешёвый" replaces="1_2 1_3" />
-		<tag id="1_2" name="Средний" replaces="1_1 1_3" />
-		<tag id="1_3" name="Дорогой" replaces="1_1 1_2" />
+		<tag id="11" name="Дешёвый" replaces="12 13" />
+		<tag id="12" name="Средний" replaces="11 13" />
+		<tag id="13" name="Дорогой" replaces="11 12" />
 	</tag>
 	<tag id="2" name="Курение" virtual="1">
-		<tag id="2_1" name="Для некурящих" replaces="2_2 2_3" />
-		<tag id="2_2" name="Смешанный" replaces="2_1 2_3" />
-		<tag id="2_3" name="Для курящих" replaces="2_1 2_2 4" />
+		<tag id="21" name="Для некурящих" replaces="221 222 23" />
+		<tag id="22" name="Смешанный" virtual="1">
+			<tag id="221" name="Один курящий зал" replaces="21 23 222 4" />
+			<tag id="222" name="Раздельные залы" replaces="21 23 221" />
+		</tag>
+		<tag id="23" name="Для курящих" replaces="21 221 222 4" />
 	</tag>
 	<tag id="3" name="Звук" virtual="1">
-		<tag id="3_1" name="Музыка" replaces="3_1_1 3_1_2">
-			<tag id="3_1_1" name="Живая музыка" replaces="3_1" />
-			<tag id="3_1_2" name="Музыка в записях" replaces="3_1" />
+		<tag id="31" name="Музыка" replaces="311 312">
+			<tag id="311" name="Живая музыка" replaces="31" />
+			<tag id="312" name="Музыка в записях" replaces="31" />
 		</tag>
-		<tag id="3_2" name="Громко" />
-		<tag id="3_3" name="Тихо" />
+		<tag id="32" name="Громко" />
+		<tag id="33" name="Тихо" />
 	</tag>
-	<tag id="4" name="Можно с детьми" replaces="2_3" />
+	<tag id="4" name="Можно с детьми" replaces="23 221" />
 </tags>
